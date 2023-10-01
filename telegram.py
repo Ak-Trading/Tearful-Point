@@ -1,8 +1,8 @@
-import asyncio
 import json
 import telebot
-
-symbols = {}
+import script
+from threading import Thread
+import asyncio
 
 class BaseBot():
     """
@@ -55,7 +55,7 @@ class BaseBot():
             
         self.token = self.data["token"]
         self.chat_id = self.data["chat_id"]
-        self.enable_telegram = self.data["telegram_enable"]
+       
         
    
         
@@ -70,26 +70,30 @@ class TelegramController(BaseBot):
     def __init__(self):
         
         super().__init__()  
+        self.commands=[]
+        
         
     def listener_start(self): 
          
         """
         listen to the user and control the system
         """
-        @self.bot.message_handler(lambda message: True)
+        @self.bot.message_handler(func=lambda message: True)
         def handle_start(message):
-            
-            print(message)  
-            
-   
+            print(message.text)  
+            script.commands.append(message.text)
+            asyncio.run(script.handle_input())
 
     def run(self):
-        try:
-            self.listener_start()
-            self.bot.polling()
-        except:
-            return None
-        
+        self.listener_start()
+        self.bot.infinity_polling()
+
 if __name__ == "__main__":
-    TelegramController().run()
+
+    TelegramBotcontroller = TelegramController()
+    TelegramBotcontroller.run()
+    
+    
+    
+    
                            
