@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/home/ahmedsamir/Documents/Ak/Tearful Point/env/bin/python3" "$0" "$@"
+'''exec' "/home/ahmedsamir/Documents/Ak/Tearful Point/env/bin/python3.10" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re
