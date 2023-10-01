@@ -161,16 +161,9 @@ class Strategy:
             order.lmtPrice = self.dict_of_args["price"]
         
         if order.orderType == "TWAP":
-            order.outsideRth=False
-            order.algoStrategy='VWAP'
-            order.orderType='LMT'
-            order.algoParams=[ TagValue(tag='noTakeLiq', value='1'),
-                               TagValue(tag='allowPastEndTime', value='0'),
-                               TagValue(tag='speedUp', value='0'), 
-                               TagValue(tag='startTime', value='20220131-18:12:51'), 
-                               TagValue(tag='endTime', value='20220131-20:12:54')]
             order.lmtPrice = self.dict_of_args["price"]
-            order.time = self.dict_of_args["time"]
+
+            print(order)
 
         try:
             pass
