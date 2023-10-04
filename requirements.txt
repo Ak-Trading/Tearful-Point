@@ -1,6 +1,10 @@
 certifi==2023.7.22
 charset-normalizer==3.3.0
+eventkit==1.0.1
+ib-insync==0.9.86
 idna==3.4
+nest-asyncio==1.5.8
+numpy==1.26.0
 pyTelegramBotAPI==4.14.0
 requests==2.31.0
 urllib3==2.0.5

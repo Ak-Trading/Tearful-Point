@@ -3,70 +3,60 @@ import asyncio
 import time
 import nest_asyncio
 nest_asyncio.apply()
+import threading
+util.patchAsyncio()
 
 commands = []
 
-ib = IB()
-ib.connect("127.0.0.1", 7497, 0)
-class Strategy:
-    def __init__(self) -> None:
+class Strategy(threading.Thread):
+    def __init__(self,*args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.string = None
         self.list_of_args = []
         self.dict_of_args = {}
-       
+        self.market_data = None
+        self.ib = IB()
+        self.ib.connect("127.0.0.1", 7497, 0)
         
 
     def get_market_data(self,contract):
-        print("# get_market_data")
-        ib.qualifyContracts(contract)
-        market_data = ib.reqMktData(contract)
-        print(market_data)
+        
+        market_data = self.ib.reqMktData(contract)
         import math
         while math.isnan(market_data.bid) or math.isnan(market_data.ask):
-            ib.sleep(0.1)
-            print("sleep")
+            self.ib.sleep(0.1)
             continue
-        print(market_data)
+        self.market_data = market_data
+        self.ib.cancelMktData(contract)
     
     def get_list_args(self):
         self.list_of_args = self.string.split(" ")
         self.list_of_args = list(map(lambda x: x.upper(), self.list_of_args))
-        print(self.list_of_args)
 
     def update_quantity(self, contract):
-        print("# update_quantity")
         self.get_market_data(contract)
+        
         if self.dict_of_args["quantity"] == "ALL":
-            print("ALL")
             try:
                 account_details = self.ib.accountSummary()
-                cash_balance = 1
-
+                cash_balance = 1000
                 for item in account_details:
                     if item.tag == "TotalCashValue":
                         cash_balance = float(item.value)
                         break
-            
-                print(cash_balance)
-                self.get_market_data(contract)
-
                 quantity = int(cash_balance / self.market_data.close)
                 self.dict_of_args["quantity"] = quantity
+                
             except Exception as e:
                 print(e)
 
         else:
             self.dict_of_args["quantity"] = int(self.dict_of_args["quantity"])
-        print(self.dict_of_args)
 
     def update_price(self, contract):
-        print("# update_price")
-        print(self.dict_of_args)
         if "price" in self.dict_of_args.keys():
             try:
-                print(self.dict_of_args["price"])
                 if self.dict_of_args["price"][3] == "+":
-                    print(self.market_data)
                     lst = self.dict_of_args["price"].split("+")
                     if lst[0] == "MID":
                         self.dict_of_args["price"] = (
@@ -96,7 +86,6 @@ class Strategy:
             except Exception as e:
                 self.dict_of_args["price"] = float(self.dict_of_args["price"])
                 pass
-            print(self.dict_of_args)
 
     def set_dict_args(self):
         if len(self.list_of_args) < 4:
@@ -106,8 +95,7 @@ class Strategy:
         self.dict_of_args["quantity"] = self.list_of_args[1].upper()
         self.dict_of_args["symbol"] = self.list_of_args[2].upper()
         self.dict_of_args["order_type"] = self.list_of_args[3].upper()
-        print(self.list_of_args)
-        print(self.dict_of_args)
+        
         if len(self.list_of_args) > 4:
             if self.dict_of_args["order_type"] == "TWAP":
                 self.dict_of_args["price"] = self.list_of_args[4]
@@ -156,7 +144,6 @@ class Strategy:
             else:
                 self.dict_of_args["price"] = self.list_of_args[4]
 
-        print(self.dict_of_args)
 
     def make_order(self):
         contract = Contract()
@@ -180,8 +167,7 @@ class Strategy:
         order.totalQuantity = int(self.dict_of_args["quantity"])
         if order.orderType == "LMT" or order.orderType == "TWAP":
             self.update_price(contract)
-
-            order.lmtPrice = self.dict_of_args["price"]
+            order.lmtPrice = round(self.dict_of_args["price"],2)
             if order.orderType == "TWAP":
                 order.algoStrategy = "Twap"
                 order.orderType = "LMT"
@@ -202,7 +188,6 @@ class Strategy:
                     order.algoParams.append(
                         TagValue(tag="endTime", value=self.dict_of_args["time"])
                     )
-                    print(order.algoParams)
 
                 else:
                     from datetime import datetime
@@ -214,9 +199,10 @@ class Strategy:
                     )
                     order.algoParams.append(TagValue(tag="endTime", value="22:00:00"))
 
-        print(order)
+    
         try:
-            x = ib.placeOrder(contract, order)
+            self.ib.placeOrder(contract, order)
+            self.ib.sleep(5)
         except Exception as e:
             print(e)
 
@@ -227,18 +213,19 @@ class Strategy:
         self.make_order()
 
 
-async def handle_input(commands):
+def handle_input():
+    global commands
     strategy = Strategy()
-    strategy.run(commands)
-
-
-def some_async_function(command):
-    asyncio.run(handle_input(command))
-
-
-
-if __name__ == "__main__":
     while True:
-        command = input("Enter command: ")
-        some_async_function(command)
-        print("Done")
+        for command in commands:
+            try:
+                strategy.run(commands[0])
+                print(f"{command}:  done")
+            except Exception as e:
+                print(e)
+                continue
+        
+        commands.clear()
+        
+        
+        
