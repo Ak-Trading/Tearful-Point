@@ -211,6 +211,7 @@ class Strategy(threading.Thread):
         self.get_list_args()
         self.set_dict_args()
         self.make_order()
+        print("#################")
 
 
 def handle_input():
