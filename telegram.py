@@ -1,28 +1,30 @@
-import asyncio
 import json
+import threading
+import asyncio
+import tracemalloc
 import telebot
+from script import commands,handle_input
+# tracemalloc.start()
+# asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
-symbols = {}
-
-class BaseBot():
+class BaseBot:
     """
     super class for telegram bot
-    
+
     attributes:
         symbols: a list of symbols to be monitored
         bot: a telebot object
     """
-    
+
     single_bot_instance = None
-    
+
     def __init__(self):
         """
-        initialize the class, read the config file and connect to the bot        
+        initialize the class, read the config file and connect to the bot
         """
         self.read_config()
         self.bot
-        
-        
+
     @property
     def bot(self):
         """
@@ -30,66 +32,68 @@ class BaseBot():
         """
         if BaseBot.single_bot_instance is None:
             try:
-                BaseBot.single_bot_instance =telebot.TeleBot(self.token)
+                BaseBot.single_bot_instance = telebot.TeleBot(self.token)
             except Exception:
-                file_path="config.json"
-                with open(file_path) as json_data_file:
-                    self.data = json.load(json_data_file)
+                print("telegram bot is not enabled")
 
-                self.data["telegram_enable"]=False
-                with open(file_path, 'w') as json_file:
-                    json.dump(self.data, json_file, indent=4)
+        return BaseBot.single_bot_instance
 
-                    return None
-    
-
-        return BaseBot.single_bot_instance       
-    
     def read_config(self):
         """
         read the config file
         """
-        file_path="config.json"
+        file_path = "config.json"
         with open(file_path) as json_data_file:
             self.data = json.load(json_data_file)
-            
+
         self.token = self.data["token"]
         self.chat_id = self.data["chat_id"]
-        self.enable_telegram = self.data["telegram_enable"]
-        
-   
-        
-  
+
+
 class TelegramController(BaseBot):
-    
-    """_summary_
-    this class is used to listen to the user and control the system
-   
     """
-    
+    this class is used to listen to the user and control the system
+    """
+
     def __init__(self):
+        super().__init__()
+        # self.strategy = Strategy()
         
-        super().__init__()  
-        
-    def listener_start(self): 
-         
+        # self.ib = IB()
+        # self.ib.connect("127.0.0.1", 7497, 0)
+        # self.strategy = Strategy(self.ib)
+
+
+    def listener_start(self):
         """
         listen to the user and control the system
         """
-        @self.bot.message_handler(lambda message: True)
+        @self.bot.message_handler(func=lambda message: True)
         def handle_start(message):
-            
-            print(message)  
-            
-   
-
+            print(message.text)
+            global commands
+            commands.append(message.text) 
+            print(id(commands))  
+            print(commands)         
+           
+                   
     def run(self):
-        try:
-            self.listener_start()
-            self.bot.polling()
-        except:
-            return None
-        
+        self.listener_start()
+        self.bot.infinity_polling()
+
+
 if __name__ == "__main__":
-    TelegramController().run()
-                           
+    TelegramBotcontroller = TelegramController()
+    thread_1 = threading.Thread(target=handle_input,daemon=True)
+    thread_2 = threading.Thread(target=TelegramBotcontroller.run,daemon=True)
+    thread_2.start()
+    thread_1.start()
+    thread_1.join()
+    thread_2.join()
+    # thread_1.start()
+    # print("started")
+    # TelegramBotcontroller.run()
+    # thread_1.join()
+    # TelegramBotcontroller.bot.infinity_polling()
+    # script.handle_input()
+
