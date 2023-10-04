@@ -135,7 +135,7 @@ class Strategy:
         self.dict_of_args["order_type"] =self.dict_of_args["order_type"].upper()
         self.dict_of_args["quantity"] =self.dict_of_args["quantity"].upper()
 
-            
+        print(self.dict_of_args)
 
     def make_order(self):
         contract = Contract()
@@ -157,13 +157,24 @@ class Strategy:
         order.action = self.dict_of_args["action"]
         order.orderType = self.dict_of_args["order_type"]
         order.totalQuantity = int(self.dict_of_args["quantity"])
+        print("aaaaaaaa")
+        parent = LimitOrder('BUY',100, 57,outsideRth=False, algoStrategy='VWAP',
+                                algoParams=[TagValue(tag='noTakeLiq', value='1'),
+                                            TagValue(tag='allowPastEndTime', value='0'), 
+                                            TagValue(tag='speedUp', value='0'),
+                                            TagValue(tag='startTime', value='20231001-18:12:51'),
+                                            TagValue(tag='endTime', value='20231002-20:12:54')])
+        x=IB.ib.placeOrder(contract,parent)
+        print(x)
         if order.orderType == "LMT" or order.orderType == "TWAP":
             order.lmtPrice = self.dict_of_args["price"]
         
         if order.orderType == "TWAP":
+            order.orderType = "LMT"
             order.lmtPrice = self.dict_of_args["price"]
 
-            print(order)
+           
+
 
         try:
             pass
