@@ -375,6 +375,7 @@ class Strategy(threading.Thread):
 
     def run(self, command):
         self.string = command
+        self.dict_of_args.clear()
         self.get_list_args()
         self.set_dict_args()
         trade = self.get_trade_exec()
