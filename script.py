@@ -1,5 +1,6 @@
 import calendar
 import datetime
+import json
 from ib_insync import *
 import asyncio
 import time
@@ -21,7 +22,12 @@ class Strategy(threading.Thread):
         self.dict_of_args = {}
         self.market_data = None
         self.ib = IB()
-        self.ib.connect("127.0.0.1", 7497, 0)
+        file_path = "config.json"
+        with open(file_path) as json_data_file:
+            self.data = json.load(json_data_file)
+
+        self.account = self.data["account"]
+        self.ib.connect("127.0.0.1", 7497, 0, account=self.account)
 
     def get_market_data(self, contract):
         market_data = self.ib.reqMktData(contract)
@@ -75,7 +81,7 @@ class Strategy(threading.Thread):
 
         if self.dict_of_args["quantity"] == "ALL":
             try:
-                account_details = self.ib.accountSummary()
+                account_details = self.ib.accountSummary(self.account)
                 cash_balance = 1000
                 for item in account_details:
                     if item.tag == "TotalCashValue":
@@ -91,8 +97,17 @@ class Strategy(threading.Thread):
             self.dict_of_args["quantity"] = int(self.dict_of_args["quantity"])
 
     def update_price(self, contract):
-        if "price" in self.dict_of_args.keys():
+        if "price" in self.dict_of_args.keys() and isinstance(self.dict_of_args["price"], str):
             try:
+                if len(self.dict_of_args["price"]) == 3:
+                    if self.dict_of_args["price"] == "MID":
+                        self.dict_of_args["price"] = (
+                            self.market_data.bid + self.market_data.ask
+                        ) / 2
+                    elif self.dict_of_args["price"] == "BID":
+                        self.dict_of_args["price"] = self.market_data.bid
+                    elif self.dict_of_args["price"] == "ASK":
+                        self.dict_of_args["price"] = self.market_data.ask
                 if self.dict_of_args["price"][3] == "+":
                     lst = self.dict_of_args["price"].split("+")
                     if lst[0] == "MID":
@@ -117,11 +132,9 @@ class Strategy(threading.Thread):
                     elif lst[0] == "ASK":
                         self.dict_of_args["price"] = self.market_data.ask
                     self.dict_of_args["price"] -= float(lst[1])
-                else:
-                    self.dict_of_args["price"] = float(self.dict_of_args["price"])
             except Exception as e:
-                self.dict_of_args["price"] = float(self.dict_of_args["price"])
                 pass
+            self.dict_of_args["price"] = float(self.dict_of_args["price"])
 
     def set_dict_args_options(self):
         self.dict_of_args["action"] = self.list_of_args[0]
@@ -133,9 +146,7 @@ class Strategy(threading.Thread):
             self.dict_of_args["symbol"] = self.list_of_args[2]
             self.dict_of_args["exchange"] = "SMART"
         if len(self.list_of_args[3]) == 3:
-            self.dict_of_args["expiration"] = self.get_third_friday(
-                self.list_of_args[3]
-            )
+            self.dict_of_args["expiration"] = self.get_third_friday(self.list_of_args[3])
         else:
             self.dict_of_args["expiration"] = self.get_option_date(
                 self.list_of_args[3][:3], self.list_of_args[3][-2:]
@@ -176,10 +187,7 @@ class Strategy(threading.Thread):
                     if self.list_of_args[5][0] == "+" or self.list_of_args[5][0] == "-":
                         self.dict_of_args["price"] += self.list_of_args[5]
 
-                        if (
-                            self.list_of_args[6] != "catch"
-                            and self.list_of_args[7] != "catch-up"
-                        ):
+                        if self.list_of_args[6] != "catch" and self.list_of_args[7] != "catch-up":
                             self.dict_of_args["time"] = self.list_of_args[6]
 
                             self.dict_of_args["catch"] = self.list_of_args[7]
@@ -190,10 +198,7 @@ class Strategy(threading.Thread):
 
                 else:
                     if len(self.list_of_args) > 5:
-                        if (
-                            self.list_of_args[5] != "catch"
-                            and self.list_of_args[5] != "catch-up"
-                        ):
+                        if self.list_of_args[5] != "catch" and self.list_of_args[5] != "catch-up":
                             self.dict_of_args["time"] = self.list_of_args[5]
                             self.dict_of_args["catch"] = ""
                             if len(self.list_of_args) == 7:
@@ -208,10 +213,10 @@ class Strategy(threading.Thread):
 
             elif self.dict_of_args["order_type"] == "LMT":
                 self.dict_of_args["price"] = self.list_of_args[4]
-
                 if self.dict_of_args["price"] in ["MID", "BID", "ASK"]:
-                    if self.list_of_args[5][0] == "+" or self.list_of_args[5][0] == "-":
-                        self.dict_of_args["price"] += self.list_of_args[5]
+                    if len(self.list_of_args) > 5:
+                        if self.list_of_args[5][0] == "+" or self.list_of_args[5][0] == "-":
+                            self.dict_of_args["price"] += self.list_of_args[5]
 
             else:
                 self.dict_of_args["price"] = self.list_of_args[4]
@@ -242,6 +247,8 @@ class Strategy(threading.Thread):
             if order.orderType == "TWAP":
                 order.algoStrategy = "Twap"
                 order.orderType = "LMT"
+                order.account = self.account
+                order.transmit = True
                 order.algoParams = []
                 if self.dict_of_args["catch"] != "":
                     order.algoParams.append(TagValue(tag="catchUp", value="True"))
@@ -252,9 +259,7 @@ class Strategy(threading.Thread):
                     from datetime import datetime
 
                     order.algoParams.append(
-                        TagValue(
-                            tag="startTime", value=datetime.now().strftime("%H:%M:%S")
-                        )
+                        TagValue(tag="startTime", value=datetime.now().strftime("%H:%M:%S"))
                     )
                     order.algoParams.append(
                         TagValue(tag="endTime", value=self.dict_of_args["time"])
@@ -264,9 +269,7 @@ class Strategy(threading.Thread):
                     from datetime import datetime
 
                     order.algoParams.append(
-                        TagValue(
-                            tag="startTime", value=datetime.now().strftime("%H:%M:%S")
-                        )
+                        TagValue(tag="startTime", value=datetime.now().strftime("%H:%M:%S"))
                     )
                     order.algoParams.append(TagValue(tag="endTime", value="22:00:00"))
 
@@ -345,7 +348,12 @@ class Strategy(threading.Thread):
         if self.dict_of_args["order_type"] == "MKT":
             self.ib.placeOrder(
                 contract,
-                MarketOrder(self.dict_of_args["action"], self.dict_of_args["quantity"]),
+                MarketOrder(
+                    self.dict_of_args["action"],
+                    self.dict_of_args["quantity"],
+                    account=self.account,
+                    transmit=True,
+                ),
             )
         elif self.dict_of_args["order_type"] == "LMT":
             if self.dict_of_args["price"] == "MID":
@@ -362,6 +370,8 @@ class Strategy(threading.Thread):
                     self.dict_of_args["action"],
                     self.dict_of_args["quantity"],
                     lmt_price,
+                    account=self.account,
+                    transmit=True,
                 ),
             )
 

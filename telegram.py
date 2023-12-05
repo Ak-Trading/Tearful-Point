@@ -1,3 +1,4 @@
+import datetime
 import json
 import threading
 import asyncio
@@ -65,7 +66,8 @@ class TelegramController(BaseBot):
         @self.bot.message_handler(func=lambda message: True)
         def handle_start(message):
             global commands
-            commands.append(message.text) 
+            if datetime.datetime.now().timestamp() - message.date < 5:
+                commands.append(message.text) 
         
                    
     def run(self):
