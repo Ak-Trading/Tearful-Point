@@ -48,7 +48,6 @@ class BaseBot:
             self.data = json.load(json_data_file)
 
         self.token = self.data["token"]
-        self.chat_id = self.data["chat_id"]
 
 
 class TelegramController(BaseBot):
