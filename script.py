@@ -5,6 +5,8 @@ from ib_insync import *
 import asyncio
 import time
 import nest_asyncio
+import zoneinfo
+
 
 nest_asyncio.apply()
 import threading
@@ -12,6 +14,8 @@ import threading
 util.patchAsyncio()
 
 commands = []
+
+tz = zoneinfo.ZoneInfo("America/New_York")
 
 
 class Strategy(threading.Thread):
@@ -259,7 +263,7 @@ class Strategy(threading.Thread):
                     from datetime import datetime
 
                     order.algoParams.append(
-                        TagValue(tag="startTime", value=datetime.now().strftime("%H:%M:%S"))
+                        TagValue(tag="startTime", value=datetime.now(tz).strftime("%H:%M:%S"))
                     )
                     order.algoParams.append(
                         TagValue(tag="endTime", value=self.dict_of_args["time"])
@@ -269,7 +273,7 @@ class Strategy(threading.Thread):
                     from datetime import datetime
 
                     order.algoParams.append(
-                        TagValue(tag="startTime", value=datetime.now().strftime("%H:%M:%S"))
+                        TagValue(tag="startTime", value=datetime.now(tz).strftime("%H:%M:%S"))
                     )
                     order.algoParams.append(TagValue(tag="endTime", value="22:00:00"))
 
