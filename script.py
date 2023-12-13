@@ -1,6 +1,7 @@
 import calendar
 import datetime
 import json
+import math
 from ib_insync import *
 import asyncio
 import time
@@ -387,7 +388,107 @@ class Strategy(threading.Thread):
         else:
             return self.make_order
 
+    def get_contract(self, trade):
+        trade_list = trade.upper().split(" ")
+        if "C" in trade_list or "P" in trade_list:
+            # options contract
+            if len(trade_list[3]) == 3:
+                trade_list[3] = self.get_third_friday(trade_list[3])
+            else:
+                trade_list[3] = self.get_option_date(trade_list[3][:3], trade_list[3][-2:])
+            contract = Option(
+                trade_list[2],
+                trade_list[3],
+                float(trade_list[5]),
+                trade_list[4],
+                "SMART",
+                "100",
+                "USD",
+            )
+            self.ib.qualifyContracts(contract)
+            return (contract, trade_list[0], int(trade_list[1]))
+        else:
+            contract = Stock(trade_list[2], "SMART", "USD")
+            self.ib.qualifyContracts(contract)
+            return (contract, trade_list[0], int(trade_list[1]))
+
+    def go_combo(self, command):
+        trades = command.upper().split("\n")[1:-1]
+        contracts = []
+        for trade in trades:
+            contracts.append(self.get_contract(trade))
+        contract = Contract(
+            symbol=contracts[0][0].symbol,
+            secType="BAG",
+            exchange="SMART",
+            currency="USD",
+            comboLegs=[
+                ComboLeg(
+                    conId=contract[0].conId,
+                    ratio=contract[2],
+                    action=contract[1],
+                    exchange="SMART",
+                )
+                for contract in contracts
+            ],
+        )
+        try:
+            price = float(command.split("\n")[-1].split(" ")[1])
+            order = LimitOrder("BUY", int(command.split("\n")[-1].split(" ")[0]), price)
+            trade = self.ib.placeOrder(contract, order)
+        except:
+            if len(command.split("\n")[-1].split(" ")) == 3:
+                price = (
+                    command.upper().split("\n")[-1].split(" ")[1]
+                    + command.upper().split("\n")[-1].split(" ")[2]
+                )
+            else:
+                price = command.upper().split("\n")[-1].split(" ")[1]
+            self.get_market_data(contract)
+            for _ in range(50):
+                self.ib.sleep(0.2)
+                if not math.isnan(self.market_data.bid) and self.market_data.bid != 0:
+                    break
+            try:
+                if len(price) == 3:
+                    if price == "MID":
+                        price = (self.market_data.bid + self.market_data.ask) / 2
+                    elif price == "BID":
+                        price = self.market_data.bid
+                    elif price == "ASK":
+                        price = self.market_data.ask
+                if price[3] == "+":
+                    lst = price.split("+")
+                    if lst[0] == "MID":
+                        price = (self.market_data.bid + self.market_data.ask) / 2
+                    elif lst[0] == "BID":
+                        price = self.market_data.bid
+                    elif lst[0] == "ASK":
+                        price = self.market_data.ask
+
+                    price += float(lst[1])
+
+                elif price[3] == "-":
+                    lst = price.split("-")
+                    if lst[0] == "MID":
+                        price = (self.market_data.bid + self.market_data.ask) / 2
+                    elif lst[0] == "BID":
+                        price = self.market_data.bid
+                    elif lst[0] == "ASK":
+                        price = self.market_data.ask
+                    price -= float(lst[1])
+            except Exception as e:
+                pass
+            price = float(price)
+            order = LimitOrder("BUY", int(command.split("\n")[-1].split(" ")[0]), price)
+            trade = self.ib.placeOrder(contract, order)
+            self.ib.sleep(0.01)
+
     def run(self, command):
+        if command.split("\n")[0].upper() == "CMB":
+            self.go_combo(command)
+            print("#################")
+            return
         self.string = command
         self.dict_of_args.clear()
         self.get_list_args()
